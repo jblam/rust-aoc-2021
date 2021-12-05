@@ -10,7 +10,7 @@ fn main() {
     let day = input.trim().parse::<u32>().expect("Input was not a number.");
     match day {
         1 => println!("Day 1: {}, {}", day01::part1(), day01::part2()),
-        2 => println!("Day 2: {}", day02::part1()),
+        2 => println!("Day 2: {}, {}", day02::part1(), day02::part2()),
         _ => println!("Nope."),
     };
 }
