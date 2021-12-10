@@ -2,6 +2,7 @@ use std::io::stdin;
 
 mod day01;
 mod day02;
+mod day03;
 
 fn main() {
     println!("What day?");
@@ -11,6 +12,7 @@ fn main() {
     match day {
         1 => println!("Day 1: {}, {}", day01::part1(), day01::part2()),
         2 => println!("Day 2: {}, {}", day02::part1(), day02::part2()),
+        3 => println!("Day 3: {}, {}", day03::part1(day03::INPUT), "TODO"),
         _ => println!("Nope."),
     };
 }
