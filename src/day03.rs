@@ -3,6 +3,18 @@ pub fn part1(s: &'static str) -> usize {
     let (gamma, epsilon) = get_rates(&output);
     gamma * epsilon
 }
+pub fn part2(s: &'static str) {
+    let mut values = s.lines().map(to_integer).collect::<Vec<_>>();
+    values.sort();
+}
+
+fn get_partition(t: &[u32], bit_index: usize, wants_majority: bool) -> &[u32] {
+    let sentinel = 1u32 << bit_index;
+    let point = t.partition_point(|i| (i & sentinel) > 0);
+    // point_is_low is true if it lies before the midpoint of the original slice
+    let point_is_low = point < t.len() / 2;
+    let wants_top_half = // hrrrng booleans
+}
 
 fn get_bit_counts(s: &'static str) -> Vec<usize> {
     let length = s.lines().next().unwrap().len();
@@ -36,6 +48,16 @@ fn iterate_string(s: &str) -> impl Iterator<Item = usize> + '_ {
             b'1' => Some(idx),
             _ => panic!("Unexpected char in input: {}", c),
         })
+}
+fn to_integer(s: &str) -> u32 {
+    s.as_bytes().iter().fold(0, |prev, cur| {
+        (prev << 1)
+            & match cur {
+                b'0' => 0,
+                b'1' => 1,
+                _ => panic!("Unexpected char in input: {}", c),
+            }
+    })
 }
 
 fn get_rates(bits: &[usize]) -> (usize, usize) {
