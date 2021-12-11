@@ -3,23 +3,52 @@ pub fn part1(s: &'static str) -> usize {
     let (gamma, epsilon) = get_rates(&output);
     gamma * epsilon
 }
-pub fn part2(s: &'static str) {
+pub fn part2(s: &'static str) -> u32 {
+    let length = s.lines().next().unwrap().len();
     let mut values = s.lines().map(to_integer).collect::<Vec<_>>();
-    values.sort();
+    values.sort_unstable();
+
+    let (o2, co2) = (
+        get_candidate(&values, length, true),
+        get_candidate(&values, length, false),
+    );
+    o2.expect("Failed to determine O2") * co2.expect("Failed to determine CO2")
+}
+
+fn get_candidate(values: &[u32], length: usize, wants_majority: bool) -> Option<u32> {
+    let mut partition = values;
+    for i in (0..length).rev() {
+        partition = get_partition(partition, i, wants_majority);
+        if partition.len() == 1 {
+            return Some(partition[0]);
+        }
+    }
+    None
 }
 
 fn get_partition(t: &[u32], bit_index: usize, wants_majority: bool) -> &[u32] {
     let sentinel = 1u32 << bit_index;
-    let point = t.partition_point(|i| (i & sentinel) > 0);
-    // point_is_low is true if it lies before the midpoint of the original slice
-    let point_is_low = point < t.len() / 2;
-    let wants_top_half = // hrrrng booleans
+    let point = t.partition_point(|i| (i & sentinel) == 0);
+    // point_is_low is true if it lies before the midpoint of the original slice,
+    // in which case the "high" half is the majority.
+
+    let wants_top_half = match point * 2 {
+        l if l <= t.len() => wants_majority,
+        _ => !wants_majority,
+    };
+
+    // let point_is_low = point < t.len() / 2;
+    // let wants_top_half = point_is_low == wants_majority;
+    if wants_top_half {
+        &t[..point]
+    } else {
+        &t[point..]
+    }
 }
 
 fn get_bit_counts(s: &'static str) -> Vec<usize> {
     let length = s.lines().next().unwrap().len();
-    let mut output = Vec::with_capacity(length);
-    output.resize(length, 0);
+    let mut output = vec![0; length];
     let mut count = 0;
     for line in input(s) {
         count += 1;
@@ -52,10 +81,10 @@ fn iterate_string(s: &str) -> impl Iterator<Item = usize> + '_ {
 fn to_integer(s: &str) -> u32 {
     s.as_bytes().iter().fold(0, |prev, cur| {
         (prev << 1)
-            & match cur {
+            | match cur {
                 b'0' => 0,
                 b'1' => 1,
-                _ => panic!("Unexpected char in input: {}", c),
+                _ => panic!("Unexpected char in input: {}", cur),
             }
     })
 }
@@ -119,7 +148,26 @@ mod tests {
         assert_eq!(vec![1, 0, 1, 1, 0], get_bit_counts(TEST_INPUT));
     }
     #[test]
-    fn gets_test_numbers() {
+    fn gets_test_part1() {
         assert_eq!((22, 9), get_rates(&[1, 0, 1, 1, 0]));
+    }
+
+    #[test]
+    fn gets_number() {
+        assert_eq!(0b111000, to_integer("111000"))
+    }
+
+    #[test]
+    fn gets_partition() {
+        let input = vec![0x00, 0xFF, 0xFF];
+        let min = get_partition(&input, 2, false);
+        let max = get_partition(&input, 2, true);
+        assert_eq!(&[0x00], min);
+        assert_eq!(&[0xFF, 0xFF], max);
+    }
+
+    #[test]
+    fn gets_test_part2() {
+        assert_eq!(230, part2(TEST_INPUT))
     }
 }

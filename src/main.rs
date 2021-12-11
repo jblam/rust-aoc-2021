@@ -12,7 +12,7 @@ fn main() {
     match day {
         1 => println!("Day 1: {}, {}", day01::part1(), day01::part2()),
         2 => println!("Day 2: {}, {}", day02::part1(), day02::part2()),
-        3 => println!("Day 3: {}, {}", day03::part1(day03::INPUT), "TODO"),
+        3 => println!("Day 3: {}, {}", day03::part1(day03::INPUT), day03::part2(day03::INPUT)),
         _ => println!("Nope."),
     };
 }
