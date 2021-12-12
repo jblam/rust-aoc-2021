@@ -1,6 +1,11 @@
 use std::collections::HashSet;
 
 const SIZE: usize = 5;
+
+fn parse_input(input: &str) -> (Vec<u8>, Vec<Board>) {
+    todo!()
+}
+
 struct Board {
     numbers: [u8; SIZE * SIZE],
     row_score: [u8; SIZE],
@@ -30,15 +35,15 @@ impl Board {
             .sum()
     }
 
-    fn consume(input: &str) -> Option<(Self, &str)> {
+    fn consume(input: &str) -> Result<Option<(Self, &str)>, ()> {
         if input.is_empty() {
-            None
+            Ok(None)
         } else {
             let mut arr = [0u8; SIZE * SIZE];
             let mut input = input;
             for i in 0..SIZE {
-                let (line, rest) = input.split_once('\n')?;
-                let line = line.trim_end();
+                let (line, rest) = input.split_once('\n').ok_or(())?;
+                let line = line.trim();
                 let part = &mut arr[i * SIZE..][..SIZE];
                 let mut j = 0;
                 for token in line.split_ascii_whitespace() {
@@ -46,21 +51,21 @@ impl Board {
                     j += 1;
                 }
                 if j != SIZE {
-                    return None;
+                    return Err(());
                 }
                 input = rest;
             }
 
-            let (blank, rest) = input.split_once('\n')?;
+            let (blank, rest) = input.split_once('\n').ok_or(())?;
             if blank.trim().is_empty() {
                 let output = Self {
                     numbers: arr,
                     row_score: [0; SIZE],
                     col_score: [0; SIZE],
                 };
-                Some((output, rest))
+                Ok(Some((output, rest)))
             } else {
-                None
+                Err(())
             }
         }
     }
@@ -110,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_board() {
+    fn parses_board() -> Result<(), ()> {
         const BOARD_TEXT: &str = r#"46 53 14 17 75
 71  4 70 99 48
 65 96 68 80 72
@@ -118,17 +123,27 @@ mod tests {
 82 35 36 23 39
 
 rest"#;
-        if let Some((Board { numbers, .. }, rest)) = Board::consume(BOARD_TEXT) {
-            assert_eq!("rest", rest);
-            assert_eq!(
-                [
-                    46, 53, 14, 17, 75, 71, 4, 70, 99, 48, 65, 96, 68, 80, 72, 3, 97, 62, 37, 88,
-                    82, 35, 36, 23, 39,
-                ],
-                numbers
-            );
-        } else {
-            assert!(false, "failed to parse board");
-        }
+        let (Board { numbers, .. }, rest) = Board::consume(BOARD_TEXT)?.ok_or(())?;
+        assert_eq!("rest", rest);
+        assert_eq!(
+            [
+                46, 53, 14, 17, 75, 71, 4, 70, 99, 48, 65, 96, 68, 80, 72, 3, 97, 62, 37, 88, 82,
+                35, 36, 23, 39,
+            ],
+            numbers
+        );
+        Ok(())
+    }
+    #[test]
+    fn parses_no_board() -> Result<(), ()>  {
+        let result = Board::consume("")?;
+        assert!(result.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn parses_error() {
+        let result =  Board::consume("not a good line");
+        assert!(result.is_err())
     }
 }
