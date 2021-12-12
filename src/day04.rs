@@ -29,6 +29,41 @@ impl Board {
             .map(|&i| i as usize)
             .sum()
     }
+
+    fn consume(input: &str) -> Option<(Self, &str)> {
+        if input.is_empty() {
+            None
+        } else {
+            let mut arr = [0u8; SIZE * SIZE];
+            let mut input = input;
+            for i in 0..SIZE {
+                let (line, rest) = input.split_once('\n')?;
+                let line = line.trim_end();
+                let part = &mut arr[i * SIZE..][..SIZE];
+                let mut j = 0;
+                for token in line.split_ascii_whitespace() {
+                    part[j] = token.parse().unwrap();
+                    j += 1;
+                }
+                if j != SIZE {
+                    return None;
+                }
+                input = rest;
+            }
+
+            let (blank, rest) = input.split_once('\n')?;
+            if blank.trim().is_empty() {
+                let output = Self {
+                    numbers: arr,
+                    row_score: [0; SIZE],
+                    col_score: [0; SIZE],
+                };
+                Some((output, rest))
+            } else {
+                None
+            }
+        }
+    }
 }
 
 fn smaller(c: char) -> Option<char> {
@@ -72,5 +107,28 @@ mod tests {
 
         let n = (0..SIZE as u8).collect::<HashSet<_>>();
         assert_eq!((SIZE..(SIZE * SIZE)).sum::<usize>(), board.score(n));
+    }
+
+    #[test]
+    fn parses_board() {
+        const BOARD_TEXT: &str = r#"46 53 14 17 75
+71  4 70 99 48
+65 96 68 80 72
+ 3 97 62 37 88
+82 35 36 23 39
+
+rest"#;
+        if let Some((Board { numbers, .. }, rest)) = Board::consume(BOARD_TEXT) {
+            assert_eq!("rest", rest);
+            assert_eq!(
+                [
+                    46, 53, 14, 17, 75, 71, 4, 70, 99, 48, 65, 96, 68, 80, 72, 3, 97, 62, 37, 88,
+                    82, 35, 36, 23, 39,
+                ],
+                numbers
+            );
+        } else {
+            assert!(false, "failed to parse board");
+        }
     }
 }
