@@ -2,8 +2,14 @@ use std::collections::HashSet;
 
 const SIZE: usize = 5;
 
-fn parse_input(input: &str) -> (Vec<u8>, Vec<Board>) {
+fn parse_input(input: &str) -> Result<(Vec<u8>, Vec<Board>), String> {
     todo!()
+}
+
+fn one_line(input: &str) -> Option<(&str, &str)> {
+    let (line, rest) = input.split_once('\n')?;
+    let line = line.trim_end_matches('\r');
+    Some((line, rest))
 }
 
 struct Board {
@@ -35,15 +41,15 @@ impl Board {
             .sum()
     }
 
-    fn consume(input: &str) -> Result<Option<(Self, &str)>, ()> {
+    fn consume(input: &str) -> Result<Option<(Self, &str)>, String> {
         if input.is_empty() {
             Ok(None)
         } else {
             let mut arr = [0u8; SIZE * SIZE];
             let mut input = input;
             for i in 0..SIZE {
-                let (line, rest) = input.split_once('\n').ok_or(())?;
-                let line = line.trim();
+                let (line, rest) = one_line(input)
+                    .ok_or(format!("line {} of the board could not be parsed", i))?;
                 let part = &mut arr[i * SIZE..][..SIZE];
                 let mut j = 0;
                 for token in line.split_ascii_whitespace() {
@@ -51,12 +57,14 @@ impl Board {
                     j += 1;
                 }
                 if j != SIZE {
-                    return Err(());
+                    return Err(format!("line {} of the board only has {} numbers", i, j));
                 }
                 input = rest;
             }
 
-            let (blank, rest) = input.split_once('\n').ok_or(())?;
+            let (blank, rest) = input
+                .split_once('\n')
+                .ok_or("Board did not terminate with an empty line".to_string())?;
             if blank.trim().is_empty() {
                 let output = Self {
                     numbers: arr,
@@ -65,7 +73,7 @@ impl Board {
                 };
                 Ok(Some((output, rest)))
             } else {
-                Err(())
+                Err("Board did not terminate with an empty line".to_string())
             }
         }
     }
@@ -115,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_board() -> Result<(), ()> {
+    fn parses_board() -> Result<(), String> {
         const BOARD_TEXT: &str = r#"46 53 14 17 75
 71  4 70 99 48
 65 96 68 80 72
@@ -123,7 +131,8 @@ mod tests {
 82 35 36 23 39
 
 rest"#;
-        let (Board { numbers, .. }, rest) = Board::consume(BOARD_TEXT)?.ok_or(())?;
+        let (Board { numbers, .. }, rest) =
+            Board::consume(BOARD_TEXT)?.ok_or("Consume unexpectedly returned None")?;
         assert_eq!("rest", rest);
         assert_eq!(
             [
@@ -135,7 +144,7 @@ rest"#;
         Ok(())
     }
     #[test]
-    fn parses_no_board() -> Result<(), ()>  {
+    fn parses_no_board() -> Result<(), String> {
         let result = Board::consume("")?;
         assert!(result.is_none());
         Ok(())
@@ -143,7 +152,7 @@ rest"#;
 
     #[test]
     fn parses_error() {
-        let result =  Board::consume("not a good line");
+        let result = Board::consume("not a good line");
         assert!(result.is_err())
     }
 }
