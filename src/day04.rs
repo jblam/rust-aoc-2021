@@ -8,6 +8,11 @@ pub fn part1(input: &str) -> usize {
     play(&numbers, &mut boards).expect("No board won")
 }
 
+pub fn part2(input: &str) -> usize {
+    let (numbers, mut boards) = parse_input(input).unwrap();
+    play_last(&numbers, boards).expect("No single unique board lost")
+}
+
 fn play(numbers: &[u8], boards: &mut [Board]) -> Option<usize> {
     let mut h = HashSet::new();
     for &n in numbers {
@@ -19,6 +24,29 @@ fn play(numbers: &[u8], boards: &mut [Board]) -> Option<usize> {
         }
     }
     None
+}
+fn play_last(numbers: &[u8], mut boards: Vec<Board>) -> Option<usize> {
+    let mut h = HashSet::new();
+    for &n in numbers {
+        h.insert(n);
+        if let [last] = boards.as_mut_slice() {
+            if last.mark(n) {
+                return Some(last.score(h) * (n as usize));
+            }
+        } else if boards.is_empty() {
+            return None;
+        } else {
+            let finished = boards
+                .iter_mut()
+                .enumerate()
+                .filter_map(|(idx, b)| if b.mark(n) { Some(idx) } else { None })
+                .collect::<Vec<_>>();
+            for &idx in finished.iter().rev() {
+                boards.remove(idx);
+            }
+        }
+    }
+    unreachable!()
 }
 
 fn parse_input(input: &str) -> Result<(Vec<u8>, Vec<Board>), String> {
@@ -108,7 +136,9 @@ impl Board {
                 for token in line.split_ascii_whitespace() {
                     // why do I need to add this error type annotation?
                     // rust-analyzer didn't need it.
-                    let result: u8 = token.parse().map_err(|op: std::num::ParseIntError| op.to_string())?;
+                    let result: u8 = token
+                        .parse()
+                        .map_err(|op: std::num::ParseIntError| op.to_string())?;
                     part[j] = result;
                     j += 1;
                 }
@@ -236,6 +266,14 @@ rest"#;
         let (numbers, mut boards) = parse_input(TEST_INPUT)?;
         let score = play(&numbers, &mut boards).ok_or("No board won".to_string())?;
         assert_eq!(4512, score);
+        Ok(())
+    }
+
+    #[test]
+    fn runs_part_two() -> Result<(), String> {
+        let (numbers, mut boards) = parse_input(TEST_INPUT)?;
+        let score = play_last(&numbers, boards).ok_or("No single unique board lost".to_string())?;
+        assert_eq!(1924, score);
         Ok(())
     }
 }
