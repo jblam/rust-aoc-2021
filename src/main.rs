@@ -3,8 +3,8 @@ use std::io::stdin;
 mod day01;
 mod day02;
 mod day03;
-#[allow(unused)]
 mod day04;
+mod day05;
 
 fn main() {
     println!("What day?");
