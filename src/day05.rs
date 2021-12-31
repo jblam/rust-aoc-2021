@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashSet, ops::RangeInclusive};
+use std::{cmp::Ordering, collections::HashSet, convert::TryInto, ops::RangeInclusive};
 
 use nom::{
     bytes::complete::tag,
@@ -142,14 +142,14 @@ impl Line {
                 } else {
                     let is_positive_x = dx.signum() == dy.signum();
                     let (start, length) = if lx < rx {
-                        ((lx, ly), rx - lx)
+                        ((lx, ly), 1 + rx - lx)
                     } else {
-                        ((rx, ry), lx - rx)
+                        ((rx, ry), 1 + lx - rx)
                     };
                     Ok(Segment::Diagonal(Diagonal {
                         start,
                         length,
-                        is_positive_x
+                        is_positive_y: is_positive_x,
                     }))
                 }
             }
@@ -157,22 +157,39 @@ impl Line {
     }
 }
 
+#[derive(Debug, PartialEq)]
 enum Segment {
     Rectilinear(Rectilinear),
     Diagonal(Diagonal),
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 struct Rectilinear(Direction, u32, RangeInclusive<u32>);
+#[derive(Debug, PartialEq)]
 struct Diagonal {
     start: (u32, u32),
     length: u32,
-    is_positive_x: bool,
+    is_positive_y: bool,
 }
 #[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Copy, Debug)]
 enum Direction {
     X,
     Y,
+}
+impl Diagonal {
+    fn points(&self) -> impl Iterator<Item = (u32, u32)> + '_ {
+        std::iter::successors(Some(self.start), move |prev| {
+            Some((
+                prev.0 + 1,
+                if self.is_positive_y {
+                    prev.1 + 1
+                } else {
+                    prev.1 - 1
+                },
+            ))
+        })
+        .take(self.length.try_into().unwrap())
+    }
 }
 
 #[cfg(test)]
@@ -230,5 +247,49 @@ mod tests {
     #[test]
     fn gets_part_1() {
         assert_eq!(5, part1(TEST_INPUT))
+    }
+
+    #[test]
+    fn parses_diagonal_direction() -> Result<(), String> {
+        let u = Point(5, 5);
+        let v_pos = Point(6, 6);
+        let v_neg = Point(6, 4);
+
+        let expected_pos = Diagonal {
+            start: (5, 5),
+            length: 2,
+            is_positive_y: true,
+        };
+        let expected_neg = Diagonal {
+            is_positive_y: false,
+            ..expected_pos
+        };
+
+        assert_eq!(
+            Line(u, v_pos).direction()?,
+            Segment::Diagonal(Diagonal { ..expected_pos })
+        );
+        assert_eq!(Line(v_pos, u).direction()?, Segment::Diagonal(expected_pos));
+        assert_eq!(
+            Line(u, v_neg).direction()?,
+            Segment::Diagonal(Diagonal { ..expected_neg })
+        );
+        assert_eq!(Line(v_neg, u).direction()?, Segment::Diagonal(expected_neg));
+        Ok(())
+    }
+
+    #[test]
+    fn enumerates_diagonal() {
+        let pos = Diagonal {
+            start: (5, 5),
+            length: 2,
+            is_positive_y: true,
+        };
+        let neg = Diagonal {
+            is_positive_y: false,
+            ..pos
+        };
+        assert_eq!(vec![(5, 5), (6, 6)], pos.points().collect::<Vec<_>>());
+        assert_eq!(vec![(5, 5), (6, 4)], neg.points().collect::<Vec<_>>());
     }
 }
