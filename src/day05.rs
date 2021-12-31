@@ -16,14 +16,26 @@ pub fn part1(input: &str) -> usize {
     intersections.len()
 }
 
-fn make_partitioins(lines: &[Line]) -> (Vec<Rectilinear>, Vec<Rectilinear>) {
-    let (mut x, mut y): (Vec<_>, Vec<_>) = lines
-        .iter()
-        .filter_map(|l| l.direction())
-        .partition(|d| d.0 == Direction::X);
+fn make_partitioins(lines: &[Line]) -> (Vec<Rectilinear>, Vec<Rectilinear>, Vec<Diagonal>) {
+    let mut x = Vec::new();
+    let mut y = Vec::new();
+    let mut d = Vec::new();
+    for l in lines {
+        match l.direction().unwrap() {
+            Segment::Rectilinear(r) => {
+                if r.0 == Direction::X {
+                    x.push(r);
+                } else {
+                    y.push(r);
+                }
+            }
+            Segment::Diagonal(s) => d.push(s),
+        }
+    }
+
     x.sort_by(order_by_major);
     y.sort_by(order_by_major);
-    return (x, y);
+    return (x, y, d);
 
     fn order_by_major(u: &Rectilinear, v: &Rectilinear) -> Ordering {
         let outer = u.1.cmp(&v.1);
@@ -63,7 +75,7 @@ fn get_subrange<'a>(items: &'a [Rectilinear], range: &'a RangeInclusive<u32>) ->
 }
 
 fn do_set_things(lines: &[Line]) -> HashSet<(u32, u32)> {
-    let (x, y) = make_partitioins(lines);
+    let (x, y, _) = make_partitioins(lines);
     let overlaps_x = get_self_overlaps(&x, |r| {
         let row = r.1;
         r.2.map(move |col| (row, col))
@@ -112,21 +124,51 @@ impl Line {
             Err("Did not consume input".to_string())
         }
     }
-    fn direction(&self) -> Option<Rectilinear> {
+    fn direction(&self) -> Result<Segment, String> {
         match *self {
-            Line(Point(lx, ly), Point(rx, ry)) if lx == rx => {
-                Some(Rectilinear(Direction::X, lx, ly.min(ry)..=ly.max(ry)))
+            Line(Point(lx, ly), Point(rx, ry)) if lx == rx => Ok(Segment::Rectilinear(
+                Rectilinear(Direction::X, lx, ly.min(ry)..=ly.max(ry)),
+            )),
+            Line(Point(lx, ly), Point(rx, ry)) if ly == ry => Ok(Segment::Rectilinear(
+                Rectilinear(Direction::Y, ly, lx.min(rx)..=lx.max(rx)),
+            )),
+            Line(Point(lx, ly), Point(rx, ry)) => {
+                // doubtless there is a more efficient way to do this,
+                // but it is too tedious.
+                let dx = (rx as i32) - (lx as i32);
+                let dy = (ry as i32) - (ly as i32);
+                if dx.abs() != dy.abs() {
+                    Err("Non-rectilinear segment was not at a strict 45 degree angle.".to_string())
+                } else {
+                    let is_positive_x = dx.signum() == dy.signum();
+                    let (start, length) = if lx < rx {
+                        ((lx, ly), rx - lx)
+                    } else {
+                        ((rx, ry), lx - rx)
+                    };
+                    Ok(Segment::Diagonal(Diagonal {
+                        start,
+                        length,
+                        is_positive_x
+                    }))
+                }
             }
-            Line(Point(lx, ly), Point(rx, ry)) if ly == ry => {
-                Some(Rectilinear(Direction::Y, ly, lx.min(rx)..=lx.max(rx)))
-            }
-            _ => None,
         }
     }
 }
 
+enum Segment {
+    Rectilinear(Rectilinear),
+    Diagonal(Diagonal),
+}
+
 #[derive(PartialEq, Eq)]
 struct Rectilinear(Direction, u32, RangeInclusive<u32>);
+struct Diagonal {
+    start: (u32, u32),
+    length: u32,
+    is_positive_x: bool,
+}
 #[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Copy, Debug)]
 enum Direction {
     X,
@@ -164,7 +206,7 @@ mod tests {
     #[test]
     fn partitions_are_sorted() -> Result<(), String> {
         let lines = Line::parse_all(TEST_INPUT)?;
-        let (mut x, mut y) = make_partitioins(&lines);
+        let (mut x, mut y, _) = make_partitioins(&lines);
         assert!(IsSorted::is_sorted_by_key(&mut x.iter_mut(), |u| u.1));
         assert!(IsSorted::is_sorted_by_key(&mut y.iter_mut(), |u| u.1));
         Ok(())
