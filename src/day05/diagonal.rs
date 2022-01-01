@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, ops::RangeInclusive};
 
 #[derive(Debug, PartialEq)]
 pub struct Diagonal {
@@ -13,6 +13,9 @@ impl Diagonal {
                 Some(prev.1 + 1)
             } else {
                 if prev.1 == 0 {
+                    // for whatever reason, take appears to evaluate the underlying
+                    // iterator even if the element shouldn't be taken, so this is
+                    // not unreachable even if the start/length is correct.
                     None
                 } else {
                     Some(prev.1 - 1)
@@ -35,8 +38,15 @@ impl Diagonal {
                 }
             }
             if c_coefficient(self) == c_coefficient(other) {
-                
-                todo!("Check for colinearity")
+                let overlap_range = RangeInclusive::new(
+                    self.start.0.max(other.start.0),
+                    (self.start.0 + self.length - 1).min(other.start.0 + other.length - 1)
+                );
+                if overlap_range.is_empty() {
+                    None
+                } else {
+                    todo!("Enumerate colinear diagonal overlap")
+                }
             } else {
                 None
             }
@@ -74,3 +84,12 @@ impl Diagonal {
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn range_can_be_inside_out() {
+        let r = 10..=0;
+        assert!(r.is_empty())
+    }
+}
