@@ -1,6 +1,10 @@
 mod diagonal;
 
-use std::{cmp::Ordering, collections::HashSet, ops::RangeInclusive};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+    ops::RangeInclusive,
+};
 
 use nom::{
     bytes::complete::tag,
@@ -21,8 +25,8 @@ pub fn part1(input: &str) -> usize {
 }
 pub fn part2(input: &str) -> usize {
     let lines = Line::parse_all(input).unwrap();
-    let intersections = do_set_things(&lines, true);
-    intersections.len()
+    let cells = do_map_things(&lines);
+    cells.values().filter(|&&v| v > 1).count()
 }
 
 fn make_partitioins(lines: &[Line]) -> (Vec<Rectilinear>, Vec<Rectilinear>, Vec<Diagonal>) {
@@ -83,6 +87,20 @@ fn get_subrange<'a>(items: &'a [Rectilinear], range: &'a RangeInclusive<u32>) ->
     &bigger[..bigger.partition_point(|r| r.1 <= *range.end())]
 }
 
+fn do_map_things(lines: &[Line]) -> HashMap<(u32, u32), usize> {
+    let mut cells = HashMap::new();
+    for l in lines {
+        for p in l.direction().unwrap().points() {
+            if let Some(r) = cells.get_mut(&p) {
+                *r = *r + 1;
+            } else {
+                cells.insert(p, 1usize);
+            }
+        }
+    }
+    cells
+}
+
 fn do_set_things(lines: &[Line], consider_diagonal: bool) -> HashSet<(u32, u32)> {
     let (x, y, d) = make_partitioins(lines);
     let overlaps_x = get_self_overlaps(&x, |r| {
@@ -125,7 +143,7 @@ fn do_set_things(lines: &[Line], consider_diagonal: bool) -> HashSet<(u32, u32)>
         }
         for i in 0..d.len() {
             for other in &d[(i + 1)..] {
-                if let Some(p) = d[i].intersection(other) {
+                for p in d[i].intersection(other) {
                     intersections.insert(p);
                 }
             }
@@ -198,9 +216,26 @@ enum Segment {
     Rectilinear(Rectilinear),
     Diagonal(Diagonal),
 }
+impl Segment {
+    fn points(&self) -> Box<dyn Iterator<Item = (u32, u32)> + '_> {
+        match self {
+            Self::Rectilinear(r) => Box::new(r.points()),
+            Self::Diagonal(d) => Box::new(d.points()),
+        }
+    }
+}
 
 #[derive(PartialEq, Eq, Debug)]
 struct Rectilinear(Direction, u32, RangeInclusive<u32>);
+
+impl Rectilinear {
+    fn points(&self) -> impl Iterator<Item = (u32, u32)> + '_ {
+        self.2.clone().map(move |ord| match self.0 {
+            Direction::Y => (ord, self.1),
+            Direction::X => (self.1, ord),
+        })
+    }
+}
 
 #[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Copy, Debug)]
 enum Direction {
@@ -322,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn enumerates_points() {
+    fn enumerates_points_1() {
         const TEST_CASE: &str = "8,0 -> 0,8";
         let line = Line::parse(TEST_CASE).unwrap();
         let diag = match line.1.direction().unwrap() {
@@ -335,11 +370,42 @@ mod tests {
     }
 
     #[test]
+    fn enumerates_points_2() {
+        const TEST_CASE: &str = "6,4 -> 2,0";
+        let line = Line::parse(TEST_CASE).unwrap();
+        let diag = match line.1.direction().unwrap() {
+            Segment::Diagonal(d) => d,
+            _ => panic!("unexpected non-diagonal line result"),
+        };
+        let points = diag.points().collect::<Vec<_>>();
+        assert_eq!((2, 0), points[0]);
+        assert_eq!((6, 4), points[points.len() - 1]);
+    }
+
+    #[test]
     fn gets_expected_intersections() {
         let lines = Line::parse_all(TEST_INPUT).unwrap();
-        let intersections = do_set_things(&lines, true);
-        assert!(intersections.contains(&(5u32, 3u32)));
-        assert!(intersections.contains(&(5u32, 5u32)));
+        let intersections = do_map_things(&lines);
+        let mut s = String::new();
+        for j in 0..=9u32 {
+            for i in 0..=9u32 {
+                let c = if let Some(count) = intersections.get(&(i, j)) {
+                    if count > &9 {
+                        '*'
+                    } else {
+                        char::from_digit(*count as u32, 10).unwrap()
+                    }
+                } else {
+                    '.'
+                };
+                s.push(c);
+            }
+            s.push('\n');
+        }
+        print!("{}", s);
+        assert!(intersections.get(&(2, 0)).unwrap_or(&0) == &1);
+        assert!(intersections.get(&(5u32, 3u32)).unwrap_or(&0) > &1);
+        assert!(intersections.get(&(5u32, 5u32)).unwrap_or(&0) > &1);
     }
 
     #[test]

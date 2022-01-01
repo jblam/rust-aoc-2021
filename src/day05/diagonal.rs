@@ -26,7 +26,7 @@ impl Diagonal {
         .take(self.length.try_into().unwrap())
     }
 
-    pub fn intersection(&self, other: &Diagonal) -> Option<(u32, u32)> {
+    fn intersection_range(&self, other: &Diagonal) -> RangeInclusive<u32> {
         if self.is_positive_y == other.is_positive_y {
             // either (positive) -x + y == c, or (negative) x + y == c.
             // if c's are equal, the lines are colinear.
@@ -39,23 +39,21 @@ impl Diagonal {
             }
             if c_coefficient(self) == c_coefficient(other) {
                 let overlap_range = RangeInclusive::new(
-                    self.start.0.max(other.start.0),
-                    (self.start.0 + self.length - 1).min(other.start.0 + other.length - 1)
+                    self.start.0.max(other.start.0) - self.start.0,
+                    (self.start.0 + self.length - 1).min(other.start.0 + other.length - 1) - self.start.0
                 );
-                if overlap_range.is_empty() {
-                    None
-                } else {
-                    todo!("Enumerate colinear diagonal overlap")
-                }
+                overlap_range
             } else {
-                None
+                1..=0
             }
         } else {
-            let (pos, neg) = if self.is_positive_y {
-                (self, other)
+            let maybe_offset = if self.is_positive_y {
+                take_intersect(self, other)
             } else {
-                (other, self)
+                take_intersect(other, self)
+                    .map(|other_offset| other.start.0 + other_offset - self.start.0)
             };
+            return maybe_offset.map_or(1..=0, |offset| offset..=offset);
             // a1x + b1y = c1
             // a2x + b2y = c2
             // -> x = (c' - b'y) / a'
@@ -67,29 +65,47 @@ impl Diagonal {
             // xpos - xneg == lneg - lpos
             // ypos - yneg == -lneg - lpos
             // -> dx + dy = -2 lpos
-            return take_intersect(pos, neg);
-            fn take_intersect(pos: &Diagonal, neg: &Diagonal) -> Option<(u32, u32)> {
+            fn take_intersect(pos: &Diagonal, neg: &Diagonal) -> Option<u32> {
                 let pos_sum = pos.start.0 + pos.start.1;
                 let neg_sum = neg.start.0 + neg.start.1;
                 let diff = neg_sum.checked_sub(pos_sum)?;
                 let lpos = if diff % 2 == 0 { Some(diff / 2) } else { None }?;
                 let lneg = (pos.start.0 + lpos).checked_sub(neg.start.0)?;
                 if lpos <= pos.length && lneg <= neg.length {
-                    Some((pos.start.0 + lpos, pos.start.1 + lpos))
+                    Some(lpos)
                 } else {
                     None
                 }
             }
         }
     }
-}
 
+    pub fn intersection(&self, other: &Diagonal) -> impl Iterator<Item = (u32, u32)> + '_ {
+        let intersection_range = self.intersection_range(other);
+        if !intersection_range.is_empty() {
+            assert!(intersection_range.start() >= &0);
+            assert!(intersection_range.end() <= &self.length, "Range {:?} lies outside bounds of self {:?}", intersection_range, self);
+        }
+        intersection_range.map(move |offset| {
+            (
+                self.start.0 + offset,
+                if self.is_positive_y {
+                    self.start.1 + offset
+                } else {
+                    self.start.1 - offset
+                },
+            )
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {
     #[test]
     fn range_can_be_inside_out() {
         let r = 10..=0;
-        assert!(r.is_empty())
+        let v = r.clone().map(|i|i).collect::<Vec<_>>();
+        assert!(v.is_empty());
+        assert!(r.is_empty());
     }
 }
