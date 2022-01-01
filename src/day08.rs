@@ -15,26 +15,25 @@ pub fn part1(input: &str) -> usize {
 }
 
 #[derive(PartialEq, Debug)]
-struct Digit<'a>(&'a str);
-impl Digit<'static> {
-    const DEFAULT: Digit<'static> = Digit("");
+struct Digit(u8);
+impl Digit {
+    const DEFAULT: Digit = Digit(0);
 }
-impl<'a> Digit<'a> {
-    fn from_str(input: &'a str) -> Self {
+impl Digit {
+    fn from_str(input: &str) -> Self {
         if input.len() > 7 {
             panic!("Unexpectedly-long string");
         }
-        if !input.is_ascii() {
-            panic!("Illegal (non-ASCII) chars");
+        let mut output = 0;
+        for b in input.bytes() {
+            let bit = b - b'a';
+            output |= 1u8 << bit;
         }
-        if input.as_bytes().iter().any(|&b| b < b'a' || b > b'g') {
-            panic!("unexpected ASCII char value");
-        }
-        Digit(input)
+        Self(output)
     }
 
-    fn infer_value(&'a self) -> Option<u8> {
-        match self.0.len() {
+    fn infer_value(&self) -> Option<u8> {
+        match self.0.count_ones() {
             2 => Some(1),
             3 => Some(7),
             4 => Some(4),
@@ -42,15 +41,19 @@ impl<'a> Digit<'a> {
             _ => None,
         }
     }
+
+    fn categorise_six_segment(&self, one: &Digit, four: &Digit) -> u8 {
+        todo!()
+    }
 }
 #[derive(PartialEq, Debug)]
-struct Entry<'a> {
-    reference: [Digit<'a>; 10],
-    output: [Digit<'a>; 4],
+struct Entry {
+    reference: [Digit; 10],
+    output: [Digit; 4],
 }
 
-impl<'a> Entry<'a> {
-    fn parse(line: &'a str) -> Entry<'a> {
+impl Entry {
+    fn parse(line: &str) -> Entry {
         let mut tokens = line.split_ascii_whitespace();
         let mut output_left = [Digit::DEFAULT; 10];
         let mut output_right = [Digit::DEFAULT; 4];
@@ -86,14 +89,14 @@ mod tests {
         let e = Entry::parse(TEST_ROW);
         assert_eq!(
             [
-                Digit("cdfeb"),
-                Digit("fcadb"),
-                Digit("cdfeb"),
-                Digit("cdbaf")
+                Digit::from_str("cdfeb"),
+                Digit::from_str("fcadb"),
+                Digit::from_str("cdfeb"),
+                Digit::from_str("cdbaf")
             ],
             e.output
         );
-        assert!(e.reference.iter().all(|d| !d.0.is_empty()));
+        assert!(e.reference.iter().all(|d| !d.0 > 0));
     }
 
     const TEST_INPUT: &str = r#"be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb | fdgacbe cefdb cefbgd gcbe
