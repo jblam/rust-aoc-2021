@@ -3,6 +3,11 @@ pub fn part1(input: &str) -> usize {
     let board = board.step_many(80);
     board.count()
 }
+pub fn part2(input: &str) -> usize {
+    let board = Board::parse(input);
+    let board = board.step_many(256);
+    board.count()
+}
 
 pub const INPUT: &str = include_str!("day06/input.txt");
 
@@ -87,5 +92,10 @@ mod tests {
     fn gets_part_1() {
         let initial = "3,4,3,1,2";
         assert_eq!(5934, part1(initial));
+    }
+    #[test]
+    fn gets_part_2() {
+        let initial = "3,4,3,1,2";
+        assert_eq!(26984457539, part2(initial));
     }
 }
