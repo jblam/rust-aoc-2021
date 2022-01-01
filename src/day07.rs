@@ -1,4 +1,5 @@
-fn part1(input: &str) -> u64 {
+pub const INPUT: &str = include_str!("day07/input.txt");
+pub fn part1(input: &str) -> u64 {
     let line = {
         let mut lines = input.lines();
         let l = lines.next().expect("No newline in source");
@@ -23,16 +24,30 @@ fn part1(input: &str) -> u64 {
         .collect::<Vec<_>>();
     items.sort();
 
-    
-    // TDD lol
-    get_cost(&items, 2)
+    let (pivot, cost) = min_search(&items);
+    cost
+}
+
+fn min_search(items: &[u64]) -> (u64, u64) {
+    let pivots = items[0]..;
+    let mut costs = pivots.map(|p| (p, get_cost(items, p))).peekable();
+    loop {
+        if let (Some(c), Some(d)) = (costs.next(), costs.peek()) {
+            if d.1 > c.1 {
+                return c;
+            }
+        } else {
+            panic!("Local minimum not found before end of collection.");
+        }
+    }
 }
 
 fn get_cost(items: &[u64], pivot: u64) -> u64 {
     let partition_point = items.partition_point(|i| i < &pivot);
     let low = &items[..partition_point];
     let high = &items[partition_point..];
-    low.len() as u64 * pivot - low.iter().sum::<u64>() + high.iter().sum::<u64>() - high.len() as u64 * pivot
+    low.len() as u64 * pivot - low.iter().sum::<u64>() + high.iter().sum::<u64>()
+        - high.len() as u64 * pivot
 }
 
 #[cfg(test)]
