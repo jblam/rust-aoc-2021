@@ -9,7 +9,7 @@ pub fn part1(input: &str) -> usize {
 }
 
 pub fn part2(input: &str) -> usize {
-    let (numbers, mut boards) = parse_input(input).unwrap();
+    let (numbers, boards) = parse_input(input).unwrap();
     play_last(&numbers, boards).expect("No single unique board lost")
 }
 
@@ -271,7 +271,7 @@ rest"#;
 
     #[test]
     fn runs_part_two() -> Result<(), String> {
-        let (numbers, mut boards) = parse_input(TEST_INPUT)?;
+        let (numbers, boards) = parse_input(TEST_INPUT)?;
         let score = play_last(&numbers, boards).ok_or("No single unique board lost".to_string())?;
         assert_eq!(1924, score);
         Ok(())
