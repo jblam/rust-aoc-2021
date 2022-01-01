@@ -12,7 +12,12 @@ use nom::{
 pub const INPUT: &str = include_str!("day05/input.txt");
 pub fn part1(input: &str) -> usize {
     let lines = Line::parse_all(input).unwrap();
-    let intersections = do_set_things(&lines);
+    let intersections = do_set_things(&lines, false);
+    intersections.len()
+}
+pub fn part2(input: &str) -> usize {
+    let lines = Line::parse_all(input).unwrap();
+    let intersections = do_set_things(&lines, true);
     intersections.len()
 }
 
@@ -74,8 +79,8 @@ fn get_subrange<'a>(items: &'a [Rectilinear], range: &'a RangeInclusive<u32>) ->
     &bigger[..bigger.partition_point(|r| r.1 <= *range.end())]
 }
 
-fn do_set_things(lines: &[Line]) -> HashSet<(u32, u32)> {
-    let (x, y, _) = make_partitioins(lines);
+fn do_set_things(lines: &[Line], consider_diagonal: bool) -> HashSet<(u32, u32)> {
+    let (x, y, d) = make_partitioins(lines);
     let overlaps_x = get_self_overlaps(&x, |r| {
         let row = r.1;
         r.2.map(move |col| (row, col))
@@ -93,6 +98,33 @@ fn do_set_things(lines: &[Line]) -> HashSet<(u32, u32)> {
         let points = rows.map(|r| (r.1, col.1));
         for p in points {
             intersections.insert(p);
+        }
+    }
+
+    if consider_diagonal {
+        for diag in &d {
+            let rx = diag.start.0..=(diag.start.0 + diag.length - 1);
+            let ry = if diag.is_positive_y {
+                diag.start.1..=(diag.start.1 + diag.length - 1)
+            } else {
+                (1 + diag.start.1 - diag.length)..=diag.start.1
+            };
+            let xs = get_subrange(&x, &rx);
+            let ys = get_subrange(&y, &ry);
+            for p in diag.points() {
+                let has_intersect = xs.iter().any(|x| x.1 == p.0 && x.2.contains(&p.1))
+                    || ys.iter().any(|y| y.1 == p.1 && y.2.contains(&p.0));
+                if has_intersect {
+                    intersections.insert(p);
+                }
+            }
+        }
+        for i in 0..d.len() {
+            for other in &d[(i + 1)..] {
+                if let Some(p) = d[i].intersection(other) {
+                    intersections.insert(p);
+                }
+            }
         }
     }
 
@@ -179,16 +211,67 @@ enum Direction {
 impl Diagonal {
     fn points(&self) -> impl Iterator<Item = (u32, u32)> + '_ {
         std::iter::successors(Some(self.start), move |prev| {
-            Some((
-                prev.0 + 1,
-                if self.is_positive_y {
-                    prev.1 + 1
+            let y = if self.is_positive_y {
+                Some(prev.1 + 1)
+            } else {
+                if prev.1 == 0 {
+                    None
                 } else {
-                    prev.1 - 1
-                },
-            ))
+                    Some(prev.1 - 1)
+                }
+            }?;
+            Some((prev.0 + 1, y))
         })
         .take(self.length.try_into().unwrap())
+    }
+
+    fn intersection(&self, other: &Diagonal) -> Option<(u32, u32)> {
+        if self.is_positive_y == other.is_positive_y {
+            // either (positive) -x + y == c, or (negative) x + y == c.
+            // if c's are equal, the lines are colinear.
+            fn c_coefficient(d: &Diagonal) -> i32 {
+                if d.is_positive_y {
+                    -(d.start.0 as i32) + (d.start.1 as i32)
+                } else {
+                    (d.start.0 + d.start.1) as i32
+                }
+            }
+            if c_coefficient(self) == c_coefficient(other) {
+                todo!("Check for colinearity")
+            } else {
+                None
+            }
+        } else {
+            let (pos, neg) = if self.is_positive_y {
+                (self, other)
+            } else {
+                (other, self)
+            };
+            // a1x + b1y = c1
+            // a2x + b2y = c2
+            // -> x = (c' - b'y) / a'
+            //      = a'.c' - b'.(c1 - a1.x) / a'.b1
+            //      = [ a'.c' - b'.c1 / a'.b1 ] / (1 + b'.a1 / a'.b1)
+
+            // or
+            // ppos + (lpos, lpos) == pneg + (lneg, -lneg)
+            // xpos - xneg == lneg - lpos
+            // ypos - yneg == -lneg - lpos
+            // -> dx + dy = -2 lpos
+            return take_intersect(pos, neg);
+            fn take_intersect(pos: &Diagonal, neg: &Diagonal) -> Option<(u32, u32)> {
+                let pos_sum = pos.start.0 + pos.start.1;
+                let neg_sum = neg.start.0 + neg.start.1;
+                let diff = neg_sum.checked_sub(pos_sum)?;
+                let lpos = if diff % 2 == 0 { Some(diff / 2) } else { None }?;
+                let lneg = (pos.start.0 + lpos).checked_sub(neg.start.0)?;
+                if lpos <= pos.length && lneg <= neg.length {
+                    Some((pos.start.0 + lpos, pos.start.1 + lpos))
+                } else {
+                    None
+                }
+            }
+        }
     }
 }
 
@@ -291,5 +374,44 @@ mod tests {
         };
         assert_eq!(vec![(5, 5), (6, 6)], pos.points().collect::<Vec<_>>());
         assert_eq!(vec![(5, 5), (6, 4)], neg.points().collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn can_diagonal_overlap() {
+        let sut = vec![
+            Line(Point(0, 0), Point(5, 5)),
+            Line(Point(0, 1), Point(2, 1)),
+            Line(Point(4, 0), Point(4, 5)),
+        ];
+        let intersections = do_set_things(&sut, true);
+        assert!(intersections.contains(&(1, 1)));
+        assert!(intersections.contains(&(4, 4)));
+        assert_eq!(intersections.len(), 2);
+    }
+
+    #[test]
+    fn enumerates_points() {
+        const TEST_CASE: &str = "8,0 -> 0,8";
+        let line = Line::parse(TEST_CASE).unwrap();
+        let diag = match line.1.direction().unwrap() {
+            Segment::Diagonal(d) => d,
+            _ => panic!("unexpected non-diagonal line result"),
+        };
+        let points = diag.points().collect::<Vec<_>>();
+        assert_eq!((0, 8), points[0]);
+        assert_eq!((8, 0), points[points.len() - 1]);
+    }
+
+    #[test]
+    fn gets_expected_intersections() {
+        let lines = Line::parse_all(TEST_INPUT).unwrap();
+        let intersections = do_set_things(&lines, true);
+        assert!(intersections.contains(&(5u32, 3u32)));
+        assert!(intersections.contains(&(5u32, 5u32)));
+    }
+
+    #[test]
+    fn gets_part_2() {
+        assert_eq!(12, part2(TEST_INPUT));
     }
 }
