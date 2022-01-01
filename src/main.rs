@@ -6,6 +6,7 @@ mod day03;
 mod day04;
 mod day05;
 mod day06;
+mod day07;
 
 fn main() {
     println!("What day?");
@@ -19,6 +20,7 @@ fn main() {
         4 => println!("Day 4: {}, {}", day04::part1(day04::INPUT), day04::part2(day04::INPUT)),
         5 => println!("Day 5: {}, {}", day05::part1(day05::INPUT), day05::part2(day05::INPUT)),
         6 => println!("Day 6: {}, {}", day06::part1(day06::INPUT), day06::part2(day06::INPUT)),
+        7 => println!("Day 7: {}, {}", day07::part1(day07::INPUT), day07::part2(day07::INPUT)),
         _ => println!("NOPE."),
     };
 }
