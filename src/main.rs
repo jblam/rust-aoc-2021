@@ -22,7 +22,7 @@ fn main() {
         5 => println!("Day 5: {}, {}", day05::part1(day05::INPUT), day05::part2(day05::INPUT)),
         6 => println!("Day 6: {}, {}", day06::part1(day06::INPUT), day06::part2(day06::INPUT)),
         7 => println!("Day 7: {}, {}", day07::part1(day07::INPUT), day07::part2(day07::INPUT)),
-        8 => println!("Day 8: {}, {}", day08::part1(day08::INPUT), "Nope"),// day07::part2(day07::INPUT)),
+        8 => println!("Day 8: {}, {}", day08::part1(day08::INPUT), day08::part2(day08::INPUT)),
         _ => println!("NOPE."),
     };
 }
