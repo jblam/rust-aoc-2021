@@ -17,7 +17,7 @@ struct Board([usize; 9]);
 impl Board {
     const BIRTH_CYCLE: usize = 6;
     fn step(&self) -> Self {
-        let mut next = self.0.clone();
+        let mut next = self.0;
         next.rotate_left(1);
         let births = next[next.len() - 1];
         next[Self::BIRTH_CYCLE] += births;

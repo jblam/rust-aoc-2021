@@ -94,16 +94,16 @@ impl Entry {
         let mut output_left = [Digit::DEFAULT; 10];
         let mut output_right = [Digit::DEFAULT; 4];
 
-        for i in 0..10 {
+        for item in &mut output_left {
             let token = tokens.next().unwrap();
-            output_left[i] = Digit::from_str(token);
+            *item = Digit::from_str(token);
         }
         if tokens.next() != Some("|") {
             panic!("Missing expected central delimiter");
         }
-        for i in 0..4 {
+        for item in &mut output_right {
             let token = tokens.next().unwrap();
-            output_right[i] = Digit::from_str(token);
+            *item = Digit::from_str(token);
         }
 
         Self {
@@ -125,8 +125,8 @@ impl Entry {
             if let Some(value) = i.infer_value() {
                 scratch[value as usize] = Some(Digit(i.0));
                 match value {
-                    1 => one = Some(i.clone()),
-                    4 => four = Some(i.clone()),
+                    1 => one = Some(i),
+                    4 => four = Some(i),
                     _ => (),
                 };
             }
@@ -137,7 +137,7 @@ impl Entry {
             let value = i.categorise_six_segment(one, four);
             scratch[value as usize] = Some(Digit(i.0));
             if value == 6 {
-                six = Some(i.clone());
+                six = Some(i);
             }
         }
         let six = six.unwrap();
@@ -145,8 +145,8 @@ impl Entry {
             scratch[i.categorise_five_segment(one, six) as usize] = Some(Digit(i.0));
         }
 
-        for i in 0..Self::REFERENCE_LENGTH {
-            self.reference[i] = Digit(scratch[i].as_ref().unwrap().0);
+        for (i, item) in scratch.iter().enumerate() {
+            self.reference[i] = Digit(item.as_ref().unwrap().0);
         }
     }
 

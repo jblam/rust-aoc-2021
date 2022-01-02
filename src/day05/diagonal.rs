@@ -11,22 +11,20 @@ impl Diagonal {
         std::iter::successors(Some(self.start), move |prev| {
             let y = if self.is_positive_y {
                 Some(prev.1 + 1)
+            } else if prev.1 == 0 {
+                // for whatever reason, take appears to evaluate the underlying
+                // iterator even if the element shouldn't be taken, so this is
+                // not unreachable even if the start/length is correct.
+                None
             } else {
-                if prev.1 == 0 {
-                    // for whatever reason, take appears to evaluate the underlying
-                    // iterator even if the element shouldn't be taken, so this is
-                    // not unreachable even if the start/length is correct.
-                    None
-                } else {
-                    Some(prev.1 - 1)
-                }
+                Some(prev.1 - 1)
             }?;
             Some((prev.0 + 1, y))
         })
         .take(self.length.try_into().unwrap())
     }
 
-    fn intersection_range(&self, other: &Diagonal) -> RangeInclusive<u32> {
+    fn intersection_range(&self, other: &Diagonal) -> Option<RangeInclusive<u32>> {
         if self.is_positive_y == other.is_positive_y {
             // either (positive) -x + y == c, or (negative) x + y == c.
             // if c's are equal, the lines are colinear.
@@ -40,20 +38,21 @@ impl Diagonal {
             if c_coefficient(self) == c_coefficient(other) {
                 let overlap_range = RangeInclusive::new(
                     self.start.0.max(other.start.0) - self.start.0,
-                    (self.start.0 + self.length - 1).min(other.start.0 + other.length - 1) - self.start.0
+                    (self.start.0 + self.length - 1).min(other.start.0 + other.length - 1)
+                        - self.start.0,
                 );
-                overlap_range
+                Some(overlap_range)
             } else {
-                1..=0
+                None
             }
         } else {
-            let maybe_offset = if self.is_positive_y {
+            let offset = if self.is_positive_y {
                 take_intersect(self, other)
             } else {
                 take_intersect(other, self)
                     .map(|other_offset| other.start.0 + other_offset - self.start.0)
-            };
-            return maybe_offset.map_or(1..=0, |offset| offset..=offset);
+            }?;
+            return Some(offset..=offset);
             // a1x + b1y = c1
             // a2x + b2y = c2
             // -> x = (c' - b'y) / a'
@@ -80,11 +79,26 @@ impl Diagonal {
         }
     }
 
+    // We're painted into a corner here:
+    // the inverse range is *VERY NAUGHTY* because, yeah it's illegal to slice with it,
+    // but there's no "empty RangeInclusive", and
+    // we're contracted to return RangeInclusive from intersection_range(), because
+    // intersection() must return Map<...<RangeInclusive>,
+    // so we can't return Range::new(0, 0) which clippy may approve of,
+    // unless we use a Box<dyn RangeBounds> which seems a bit over-the-top. 
+    #[allow(clippy::reversed_empty_ranges)]
+    const EMPTY: RangeInclusive<u32> = 1..=0;
+
     pub fn intersection(&self, other: &Diagonal) -> impl Iterator<Item = (u32, u32)> + '_ {
-        let intersection_range = self.intersection_range(other);
+        let intersection_range = self.intersection_range(other).unwrap_or(Self::EMPTY);
         if !intersection_range.is_empty() {
             assert!(intersection_range.start() >= &0);
-            assert!(intersection_range.end() <= &self.length, "Range {:?} lies outside bounds of self {:?}", intersection_range, self);
+            assert!(
+                intersection_range.end() <= &self.length,
+                "Range {:?} lies outside bounds of self {:?}",
+                intersection_range,
+                self
+            );
         }
         intersection_range.map(move |offset| {
             (
@@ -101,11 +115,11 @@ impl Diagonal {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     #[test]
     fn range_can_be_inside_out() {
-        let r = 10..=0;
-        let v = r.clone().map(|i|i).collect::<Vec<_>>();
+        let v = Diagonal::EMPTY.clone().map(|i| i).collect::<Vec<_>>();
         assert!(v.is_empty());
-        assert!(r.is_empty());
+        assert!(Diagonal::EMPTY.is_empty());
     }
 }

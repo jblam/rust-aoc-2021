@@ -60,7 +60,7 @@ fn make_partitioins(lines: &[Line]) -> (Vec<Rectilinear>, Vec<Rectilinear>, Vec<
 }
 
 fn get_self_overlaps<'a, F, G>(
-    items: &'a Vec<Rectilinear>,
+    items: &'a [Rectilinear],
     m: F,
 ) -> impl Iterator<Item = (u32, u32)> + 'a
 where
@@ -92,7 +92,7 @@ fn do_map_things(lines: &[Line]) -> HashMap<(u32, u32), usize> {
     for l in lines {
         for p in l.direction().unwrap().points() {
             if let Some(r) = cells.get_mut(&p) {
-                *r = *r + 1;
+                *r += 1;
             } else {
                 cells.insert(p, 1usize);
             }

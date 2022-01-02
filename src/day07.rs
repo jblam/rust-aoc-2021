@@ -34,7 +34,7 @@ fn find(input: &str, cost: impl Fn(u64, u64) -> u64) -> u64 {
         .split(',')
         .map(|s| s.parse::<u64>().unwrap())
         .collect::<Vec<_>>();
-    items.sort();
+    items.sort_unstable();
 
     let (_pivot, cost) = min_search(&items, cost);
     cost
@@ -57,7 +57,7 @@ fn min_search(items: &[u64], cost: impl Fn(u64, u64) -> u64) -> (u64, u64) {
 }
 
 fn get_cost_1(pivot: u64, item: u64) -> u64 {
-    item.checked_sub(pivot).or(pivot.checked_sub(item)).unwrap()
+    item.checked_sub(pivot).or_else(|| pivot.checked_sub(item)).unwrap()
 }
 fn get_cost_2(pivot: u64, item: u64) -> u64 {
     let difference = get_cost_1(pivot, item);
