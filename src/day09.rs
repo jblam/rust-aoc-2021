@@ -1,5 +1,4 @@
 mod windower;
-
 use windower::Windower;
 
 pub const INPUT: &str = include_str!("day09/input.txt");
@@ -23,7 +22,7 @@ pub fn part2(input: &str) -> usize {
         for (col, cell) in b.iter().enumerate() {
             let blob_id = {
                 let up = maybe_prev.map(|r| r[col]).flatten();
-                let left = if col == 0 { None } else { cur[col - 1] };
+                let left = cur.last().copied().flatten();
                 match (cell, up, left) {
                     (b'9', _, _) => None,
                     (_, Some(i), None) => Some(i),
@@ -34,9 +33,9 @@ pub fn part2(input: &str) -> usize {
                         Some(id)
                     }
                     (_, Some(i), Some(j)) => {
-                        let low = i.min(j);
-                        let high = i.max(j);
-                        blobs[low] = high;
+                        let high = blobs[i].max(blobs[j]);
+                        blobs[i] = high;
+                        blobs[j] = high;
                         Some(high)
                     }
                 }
@@ -48,30 +47,26 @@ pub fn part2(input: &str) -> usize {
 
     let mut counts = Vec::with_capacity(blobs.len());
     counts.resize(blobs.len(), 0);
-    fn find_blob_id(blobs: &Vec<usize>, cell: usize) -> usize {
-        let mut idx = cell;
-        loop {
-            let next = blobs[idx];
-            if idx == next {
-                return idx;
-            }
-            idx = next;
-        }
-    }
 
     for row in cells {
         for cell in row {
             if let Some(value) = cell {
-                let id = find_blob_id(&blobs, value);
-                counts[id] += 1;
+                counts[value] += 1;
             }
         }
     }
 
-    blobs.sort_by_key(|&id| -(counts[id] as isize));
-    blobs.dedup();
+    for (idx, &target) in blobs.iter().enumerate() {
+        if idx != target {
+            counts[target] += counts[idx];
+            counts[idx] = 0;
+        }
+    }
 
-    blobs[..3].iter().map(|&b| counts[b]).fold(1, |prev, count| prev * dbg!(count))
+    counts.sort();
+    dbg!(&counts[(counts.len() - 3)..])
+        .iter()
+        .fold(1, |prev, count| prev * dbg!(count))
 }
 
 fn is_min(window: &[u8; 9]) -> Option<u8> {
