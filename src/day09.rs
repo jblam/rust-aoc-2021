@@ -1,8 +1,6 @@
 mod windower;
-mod blob;
 
 use windower::Windower;
-use blob::{Blob, LineRange};
 
 pub const INPUT: &str = include_str!("day09/input.txt");
 pub fn part1(input: &'static str) -> usize {
@@ -16,58 +14,64 @@ pub fn part1(input: &'static str) -> usize {
 }
 
 pub fn part2(input: &str) -> usize {
-    let mut active_blobs = Vec::<Blob>::new();
-    let mut closed_blobs = Vec::new();
-    for (row, line) in input.lines().enumerate() {
-        let ranges = LineRange::get_line_ranges(row, line.as_bytes())
-            .filter(|r| r.size() > 0)
-            .collect::<Vec<_>>();
-        // we now have active_blobs X ranges, which can bifurcate in two ways:
-        // - an existing blob can link to two new ranges, or
-        // - a single new range can unite two previously-separate blobs
-        // The former is represented by a single blob having mutliple "tails";
-        // the latter requires we show a candidate range to each active blob,
-        // add to the first match and merge subsequent matches.
-        for r in ranges {
-            let mut merge_target: Option<&mut Blob> = None;
-            for a in &mut active_blobs {
-                if a.matches(&r) {
-                    if let Some(ref mut target) = merge_target {
-                        target.merge(a);
-                    } else {
-                        a.push(r.clone());
-                        merge_target = Some(a);
+    let mut blobs: Vec<usize> = Vec::new();
+    let mut cells: Vec<Vec<Option<usize>>> = Vec::new();
+    for line in input.lines() {
+        let b = line.as_bytes();
+        let maybe_prev = cells.last();
+        let mut cur = Vec::with_capacity(b.len());
+        for (col, cell) in b.iter().enumerate() {
+            let blob_id = {
+                let up = maybe_prev.map(|r| r[col]).flatten();
+                let left = if col == 0 { None } else { cur[col - 1] };
+                match (cell, up, left) {
+                    (b'9', _, _) => None,
+                    (_, Some(i), None) => Some(i),
+                    (_, None, Some(i)) => Some(i),
+                    (_, None, None) => {
+                        let id = blobs.len();
+                        blobs.push(id);
+                        Some(id)
+                    }
+                    (_, Some(i), Some(j)) => {
+                        let low = i.min(j);
+                        let high = i.max(j);
+                        blobs[low] = high;
+                        Some(high)
                     }
                 }
-            }
-            if merge_target.is_none() {
-                active_blobs.push(Blob::new_with(r));
-            }
-        }
-
-        for maybe_inactive in active_blobs.iter_mut() {
-            match maybe_inactive.tail_row() {
-                Some(r) if r < row => {
-                    let mut replacement = Blob::empty();
-                    std::mem::swap(&mut replacement, maybe_inactive);
-                    closed_blobs.push(replacement);
-                }
-                _ => (),
             };
+            cur.push(blob_id);
         }
-
-        active_blobs.retain(|b| !b.is_empty());
+        cells.push(cur);
     }
-    closed_blobs.append(&mut active_blobs);
-    closed_blobs.sort_by_key(|v| -(v.size() as isize));
-    assert!(
-        closed_blobs.len() >= 3,
-        "Expected at least 3 blobs; found {}.",
-        closed_blobs.len()
-    );
-    closed_blobs[..3].iter().fold(1, |prev, ranges| {
-        prev * ranges.size()
-    })
+
+    let mut counts = Vec::with_capacity(blobs.len());
+    counts.resize(blobs.len(), 0);
+    fn find_blob_id(blobs: &Vec<usize>, cell: usize) -> usize {
+        let mut idx = cell;
+        loop {
+            let next = blobs[idx];
+            if idx == next {
+                return idx;
+            }
+            idx = next;
+        }
+    }
+
+    for row in cells {
+        for cell in row {
+            if let Some(value) = cell {
+                let id = find_blob_id(&blobs, value);
+                counts[id] += 1;
+            }
+        }
+    }
+
+    blobs.sort_by_key(|&id| -(counts[id] as isize));
+    blobs.dedup();
+
+    blobs[..3].iter().map(|&b| counts[b]).fold(1, |prev, count| prev * dbg!(count))
 }
 
 fn is_min(window: &[u8; 9]) -> Option<u8> {
