@@ -1,6 +1,8 @@
 mod windower;
+mod blob;
 
 use windower::Windower;
+use blob::{Blob, LineRange};
 
 pub const INPUT: &str = include_str!("day09/input.txt");
 pub fn part1(input: &'static str) -> usize {
@@ -33,20 +35,20 @@ pub fn part2(input: &str) -> usize {
                     if let Some(ref mut target) = merge_target {
                         target.merge(a);
                     } else {
-                        a.push(LineRange { ..r });
+                        a.push(r.clone());
                         merge_target = Some(a);
                     }
                 }
             }
             if merge_target.is_none() {
-                active_blobs.push(Blob(vec![r]));
+                active_blobs.push(Blob::new_with(r));
             }
         }
 
         for maybe_inactive in active_blobs.iter_mut() {
-            match maybe_inactive.0.last() {
-                Some(LineRange { row: r, .. }) if r < &row => {
-                    let mut replacement = Blob(Vec::new());
+            match maybe_inactive.tail_row() {
+                Some(r) if r < row => {
+                    let mut replacement = Blob::empty();
                     std::mem::swap(&mut replacement, maybe_inactive);
                     closed_blobs.push(replacement);
                 }
@@ -54,72 +56,20 @@ pub fn part2(input: &str) -> usize {
             };
         }
 
-        active_blobs.retain(|b| !b.0.is_empty());
+        active_blobs.retain(|b| !b.is_empty());
     }
     closed_blobs.append(&mut active_blobs);
-    closed_blobs.sort_by_key(|v| v.0.iter().map(|r| -(r.size() as isize)).sum::<isize>());
+    closed_blobs.sort_by_key(|v| -(v.size() as isize));
     assert!(
         closed_blobs.len() >= 3,
         "Expected at least 3 blobs; found {}.",
         closed_blobs.len()
     );
     closed_blobs[..3].iter().fold(1, |prev, ranges| {
-        prev * ranges.0.iter().map(|r| r.size()).sum::<usize>()
+        prev * ranges.size()
     })
 }
 
-#[derive(PartialEq, Debug)]
-struct LineRange<'a> {
-    row: usize,
-    col: usize,
-    values: &'a [u8],
-}
-
-struct Blob<'a>(Vec<LineRange<'a>>);
-impl<'a> Blob<'a> {
-    fn matches(&self, range: &LineRange<'a>) -> bool {
-        self.0
-            .iter()
-            .rev()
-            .skip_while(|r| r.row >= range.row)
-            .take_while(|r| r.row == range.row - 1)
-            .filter(|&r| r.has_intersection(range))
-            .next()
-            .is_some()
-    }
-    fn push(&mut self, range: LineRange<'a>) {
-        assert!(self.0.last().map(|r| r.row <= range.row).unwrap_or(true));
-        self.0.push(range);
-    }
-    fn merge(&mut self, other: &mut Blob<'a>) {
-        self.0.append(&mut other.0);
-    }
-}
-
-impl<'a> LineRange<'a> {
-    fn get_line_ranges(row: usize, line: &'a [u8]) -> impl Iterator<Item = LineRange<'a>> + 'a {
-        line.split(|b| b == &b'9')
-            .enumerate()
-            .scan(None, move |state, (index, this_slice)| {
-                let yielded_length = state.unwrap_or(0);
-                *state = Some(yielded_length + this_slice.len());
-                Some(Self {
-                    row,
-                    col: index + yielded_length,
-                    values: this_slice,
-                })
-            })
-    }
-    fn end(&self) -> usize {
-        self.col + self.values.len()
-    }
-    fn size(&self) -> usize {
-        self.values.len()
-    }
-    fn has_intersection(&self, other: &LineRange) -> bool {
-        other.end() > self.col && other.col < self.end()
-    }
-}
 fn is_min(window: &[u8; 9]) -> Option<u8> {
     let other_min = [1, 3, 5, 7].iter().map(|&i| window[i]).min().unwrap();
     if other_min > window[4] {
