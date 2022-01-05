@@ -1,12 +1,125 @@
+mod windower;
+
+use windower::Windower;
+
 pub const INPUT: &str = include_str!("day09/input.txt");
 pub fn part1(input: &'static str) -> usize {
     let windows = Windower::new(input);
-    windows.filter_map(|w| {
-        let local_min = is_min(&w)?;
-        Some(1 + local_min as usize)
-    }).sum()
+    windows
+        .filter_map(|w| {
+            let local_min = is_min(&w)?;
+            Some(1 + local_min as usize)
+        })
+        .sum()
 }
 
+pub fn part2(input: &str) -> usize {
+    let mut active_blobs = Vec::<Blob>::new();
+    let mut closed_blobs = Vec::new();
+    for (row, line) in input.lines().enumerate() {
+        let ranges = LineRange::get_line_ranges(row, line.as_bytes())
+            .filter(|r| r.size() > 0)
+            .collect::<Vec<_>>();
+        // we now have active_blobs X ranges, which can bifurcate in two ways:
+        // - an existing blob can link to two new ranges, or
+        // - a single new range can unite two previously-separate blobs
+        // The former is represented by a single blob having mutliple "tails";
+        // the latter requires we show a candidate range to each active blob,
+        // add to the first match and merge subsequent matches.
+        for r in ranges {
+            let mut merge_target: Option<&mut Blob> = None;
+            for a in &mut active_blobs {
+                if a.matches(&r) {
+                    if let Some(ref mut target) = merge_target {
+                        target.merge(a);
+                    } else {
+                        a.push(LineRange { ..r });
+                        merge_target = Some(a);
+                    }
+                }
+            }
+            if merge_target.is_none() {
+                active_blobs.push(Blob(vec![r]));
+            }
+        }
+
+        for maybe_inactive in active_blobs.iter_mut() {
+            match maybe_inactive.0.last() {
+                Some(LineRange { row: r, .. }) if r < &row => {
+                    let mut replacement = Blob(Vec::new());
+                    std::mem::swap(&mut replacement, maybe_inactive);
+                    closed_blobs.push(replacement);
+                }
+                _ => (),
+            };
+        }
+
+        active_blobs.retain(|b| !b.0.is_empty());
+    }
+    closed_blobs.append(&mut active_blobs);
+    closed_blobs.sort_by_key(|v| v.0.iter().map(|r| -(r.size() as isize)).sum::<isize>());
+    assert!(
+        closed_blobs.len() >= 3,
+        "Expected at least 3 blobs; found {}.",
+        closed_blobs.len()
+    );
+    closed_blobs[..3].iter().fold(1, |prev, ranges| {
+        prev * ranges.0.iter().map(|r| r.size()).sum::<usize>()
+    })
+}
+
+#[derive(PartialEq, Debug)]
+struct LineRange<'a> {
+    row: usize,
+    col: usize,
+    values: &'a [u8],
+}
+
+struct Blob<'a>(Vec<LineRange<'a>>);
+impl<'a> Blob<'a> {
+    fn matches(&self, range: &LineRange<'a>) -> bool {
+        self.0
+            .iter()
+            .rev()
+            .skip_while(|r| r.row >= range.row)
+            .take_while(|r| r.row == range.row - 1)
+            .filter(|&r| r.has_intersection(range))
+            .next()
+            .is_some()
+    }
+    fn push(&mut self, range: LineRange<'a>) {
+        assert!(self.0.last().map(|r| r.row <= range.row).unwrap_or(true));
+        self.0.push(range);
+    }
+    fn merge(&mut self, other: &mut Blob<'a>) {
+        self.0.append(&mut other.0);
+    }
+}
+
+impl<'a> LineRange<'a> {
+    fn get_line_ranges(row: usize, line: &'a [u8]) -> impl Iterator<Item = LineRange<'a>> + 'a {
+        line.split(|b| b == &b'9')
+            .enumerate()
+            .scan(None, move |state, (index, this_slice)| {
+                let yielded_length = state.unwrap_or(0);
+                *state = Some(yielded_length + this_slice.len());
+                Some(Self {
+                    row,
+                    col: index + yielded_length,
+                    values: this_slice,
+                })
+            })
+    }
+    fn end(&self) -> usize {
+        self.col + self.values.len()
+    }
+    fn size(&self) -> usize {
+        self.values.len()
+    }
+    fn has_intersection(&self, other: &LineRange) -> bool {
+        other.end() > self.col && other.col < self.end()
+    }
+}
 fn is_min(window: &[u8; 9]) -> Option<u8> {
     let other_min = [1, 3, 5, 7].iter().map(|&i| window[i]).min().unwrap();
     if other_min > window[4] {
@@ -15,80 +128,15 @@ fn is_min(window: &[u8; 9]) -> Option<u8> {
         None
     }
 }
-
-struct Windower {
-    _source: &'static str,
-    lines: Vec<&'static [u8]>,
-    index: usize,
-}
-impl Windower {
-    pub fn new(source: &'static str) -> Self {
-        let lines = source.lines().map(|s| s.as_bytes()).collect::<Vec<_>>();
-        Self {
-            _source: source,
-            lines,
-            index: 0,
-        }
-    }
-}
-impl Iterator for Windower {
-    type Item = [u8; 9];
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut output = [0xFFu8; 9];
-        let line_length = self.lines[0].len();
-        let (row, col) = (self.index / line_length, self.index % line_length);
-        if row >= self.lines.len() {
-            None
-        } else {
-            self.index += 1;
-            let (col_source, col_dest) = match col {
-                0 => (0..=1, 1..=2),
-                i if i + 1 < line_length => ((i - 1)..=(i + 1), (0..=2)),
-                i => ((i - 1)..=i, 0..=1),
-            };
-
-            if row > 0 {
-                let source = &self.lines[row - 1][col_source.clone()];
-                let dest = &mut output[col_dest.clone()];
-                dest.copy_from_slice(source);
-            }
-            {
-                let source = &self.lines[row][col_source.clone()];
-                let dest = &mut output[(col_dest.start() + 3)..=(col_dest.end() + 3)];
-                dest.copy_from_slice(source);
-            }
-            if row + 1 < self.lines.len() {
-                let source = &self.lines[row + 1][col_source.clone()];
-                let dest = &mut output[(col_dest.start() + 6)..=(col_dest.end() + 6)];
-                dest.copy_from_slice(source);
-            }
-            Some(output)
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const TEST_INPUT: &str = r#"2199943210
+    pub const TEST_INPUT: &str = r#"2199943210
 3987894921
 9856789892
 8767896789
 9899965678"#;
-
-    #[test]
-    fn creates_windows() {
-        let w = Windower::new(TEST_INPUT);
-        let all = w.collect::<Vec<_>>();
-        assert_eq!(10 * 5, all.len());
-        assert_eq!([0xff, 0xff, 0xff, 0xff, b'2', b'1', 0xff, b'3', b'9'], all[0]);
-        assert_eq!(
-            [b'8', b'9', 0xff, b'7', b'8', 0xff, 0xff, 0xff, 0xff],
-            all[all.len() - 1]
-        );
-    }
 
     #[test]
     fn finds_min() {
@@ -101,5 +149,10 @@ mod tests {
     #[test]
     fn gets_part_1() {
         assert_eq!(15, part1(TEST_INPUT));
+    }
+
+    #[test]
+    fn gets_part_2() {
+        assert_eq!(1134, part2(TEST_INPUT))
     }
 }

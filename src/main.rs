@@ -24,7 +24,7 @@ fn main() {
         6 => println!("Day 6: {}, {}", day06::part1(day06::INPUT), day06::part2(day06::INPUT)),
         7 => println!("Day 7: {}, {}", day07::part1(day07::INPUT), day07::part2(day07::INPUT)),
         8 => println!("Day 8: {}, {}", day08::part1(day08::INPUT), day08::part2(day08::INPUT)),
-        9 => println!("Day 9: {}, {}", day09::part1(day09::INPUT), "Nope"),// day08::part2(day08::INPUT)),
+        9 => println!("Day 9: {}, {}", day09::part1(day09::INPUT), day09::part2(day09::INPUT)),
         _ => println!("NOPE."),
     };
 }
